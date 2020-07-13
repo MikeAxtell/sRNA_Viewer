@@ -92,6 +92,7 @@ The above command would create a pdf file called 'output.pdf' that showed sRNA d
 Alternatively, the process can be broken into two separate steps, first writing a tab-delimited text file of depths using sRNA_coverage.pl , then inputting that to sRNA_Viewer.R using option -c
 
 `sRNA_coverage.pl -b bamfileList.txt -c Chr1:10993-11087 > coverage.tsv`
+
 `sRNA_Viewer.R -c coverage.tsv -p output.pdf`
 
 ![sRNA_Viewer_Image](./images/test3.png)
