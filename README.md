@@ -26,9 +26,12 @@ Clone the git repository
 
 Alternatively, if you don't have git installed, you can go to the [github page](https://github.com/MikeAxtell/sRNA_Viewer) and download a zip file containing the code.
 
-cd into the sRNA_Viewer directory and ensure that the three scripts are executable. If not, use chmod to make them executable:
+cd into the sRNA_Viewer directory and ensure that the three scripts are executable. If not, use chmod to make them executable
+
 `chmod +x add_YS.pl`
+
 `chmod +x sRNA_coverage.pl`
+
 `chmod +x sRNA_Viewer.R`
 
 For convenience, it is recommended that the three scripts (add_YS.pl, sRNA_coverage.pl, and sRNA_Viewer.R) be placed in the user's PATH so they can be called directly.
@@ -95,9 +98,11 @@ Alternatively, the process can be broken into two separate steps, first writing 
 
 `sRNA_Viewer.R -c coverage.tsv -p output.pdf`
 
+The image below is an example outout from sRNA_Viewer.R, analyzing 12 BAM files at once. It is a microRNA locus that mostly makes 22 nt miRNAs. The negative numbers indicate accumulation from the - genomic strand. There is obvious differential expression when comparing the 12 different libraries. The two "stacks" of reads represent the microRNA and microRNA* strands, typical of microRNA biogenesis.
+
 ![sRNA_Viewer_Image](./images/test3.png)
 
-The image above is an example outout from sRNA_Viewer.R. It is a microRNA locus that mostly makes 22 nt miRNAs. The negative numbers indicate accumulation from the - genomic strand. There is obvious differential expression when comparing the 12 different libraries. The two "stacks" of reads represent the microRNA and microRNA* strands, typical of microRNA biogenesis.
+
 
 
 
