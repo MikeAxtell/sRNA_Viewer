@@ -16,7 +16,7 @@ mja18@psu.edu
 - perl5 , installed at the usual /usr/bin/perl
 - [R](https://www.r-project.org) , with packages "[tidyverse](https://www.tidyverse.org)", "[cowplot](https://cran.r-project.org/web/packages/cowplot/vignettes/introduction.html)", and "[docopt](https://github.com/docopt/docopt.R)"  installed. R version 4.0.0 was used for development. If needed, you can install the required packages (from within R) like so:
 `install.packages(c("cowplot","tidyverse","docopt"))`
-- [samtools](http://www.htslib.org) , installed in the user's PATH. samtools version 1.10 (using htslib 1.10) was used for development.
+- [samtools](http://www.htslib.org) , installed in the user's PATH. samtools version 1.10 (using htslib 1.10) was used for development. MUST be samtools version 1.8 or greater!
 
 ### Clone repo and install scripts
 
