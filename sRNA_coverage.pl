@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use Getopt::Std;
 getopts('hvb:c:');
-$version = 0.5;
+$version = 0.6;
 $usage = "sRNA_coverage.pl version $version
 
 USAGE: sRNA_coverage.pl -b bam_file_list.txt -c chr:start-stop
@@ -108,31 +108,22 @@ foreach $bam_file (@bam_files) {
 
     # Get depths for strand & category
     for($i = 0; $i < 10; ++$i) {
-        $got_start = 0;
-        $got_stop = 0;
+        %actual_lines = ();
         open(DEPTH, "samtools view -b -d $YS[$i] $fs[$i] $bam_file $opt_c | samtools depth -d 0 - |");
         while (<DEPTH>) {
             chomp;
             @f = split("\t", $_ );  ## f[1] is coordinate
-            $got_one = 1;
-            if($f[1] == $start) {
-                $got_start = 1;
-            }
-            if($f[1] == $stop) {
-                $got_stop = 1;
-            }
             $rpm = sprintf("%.2f", $f[2] / $Mcount);
-            print $_ . "\t$rpm\t" . $YS2[$i] . "\t" . $signs[$i] . "\t$bam_short\n";
+            $actual_lines{$f[1]} = $_ . "\t$rpm\t" . $YS2[$i] . "\t" . $signs[$i] . "\t$bam_short\n";
         }
         close DEPTH;
-        
-        # Add zero lines if needed. Each category needs a line at the start and stop, minimally.
-        #  this is required for proper plotting by sRNA_Viewer.R
-        unless($got_start) {
-            print "$chromosome\t$start\t0\t0.00\t$YS2[$i]\t$signs[$i]\t$bam_short\n";
-        }
-        unless($got_stop) {
-            print "$chromosome\t$stop\t0\t0.00\t$YS2[$i]\t$signs[$i]\t$bam_short\n";
+        # ensure all positions in the query have a line
+        for($j = $start; $j <= $stop; ++$j) {
+            if(exists($actual_lines{$j})) {
+                print $actual_lines{$j};
+            } else {
+                print "$chromosome\t$j\t0\t0.00\t$YS2[$i]\t$signs[$i]\t$bam_short\n";
+            }
         }
     }
 }
