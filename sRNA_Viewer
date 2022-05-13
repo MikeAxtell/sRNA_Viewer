@@ -1,0 +1,457 @@
+#!/usr/bin/env Rscript --vanilla
+
+# require platform "unix". Sorry windows !
+if(.Platform$OS.type != "unix") {
+  stop('.Platform$OS.type of your device must be "unix"!')
+}
+
+# Load required libraries, quietly
+if(!suppressPackageStartupMessages(require(docopt))) {
+  stop("R package docopt is required, but could not be loaded. Make sure it is installed!")
+}
+if(!suppressPackageStartupMessages(require(tidyverse))) {
+  stop("R package tidyverse is required, but could not be loaded. Make sure it is installed!")
+}
+if(!suppressPackageStartupMessages(require(cowplot))) {
+  stop("R package cowplot is required, but could not be loaded. Make sure it is installed!")
+}
+if(!suppressPackageStartupMessages(require(IRanges))) {
+  stop("R package IRanges is required, but could not be loaded. Make sure it is installed!")
+}
+
+# require samtools be findable by Sys.which
+if (grepl('samtools', as.vector(Sys.which("samtools"))[1]) == FALSE) {
+  stop(paste("Function sRNA_depth_by_size requires executable samtools, but",
+             "samtools was not found in the PATH : ", Sys.getenv("PATH")))
+}
+# require tabix be findable by Sys.which
+if (grepl('tabix', as.vector(Sys.which("tabix"))[1]) == FALSE) {
+  stop(paste("Function sRNA_depth_by_size requires executable tabix, but",
+             "tabix was not found in the PATH : ", Sys.getenv("PATH")))
+}
+
+# Define options and documentation
+"sRNA_Viewer
+
+Usage:
+  sRNA_Viewer [-g TABIXGFF -l VLINE -r RGLIST] -c COORDINATES -b BAMLIST -p OUTPUTFILE
+  sRNA_Viewer -h | --help
+  sRNA_Viewer -v | --version
+
+Options:
+  -g TABIXGFF    # tabix-ed gff3 file containing transcript/mRNA, exon, and CDS
+  -l VLINE       # x-coordinate to draw a vertical line at
+  -r RGLIST      # csv file with read groups in column 1, display names in column 2. Applies to first bamfile from BAMLIST
+  -h --help      # Print this message and quit
+  -v --version   # Print version number and quit
+
+Required Arguments:
+  -c COORDINATES # Location to analyze in format Chr:Start-Stop (one-based, inclusive)
+  -b BAMLIST     # Simple csv file with .bam files in column one, display names in column 2
+  -p OUTPUTFILE  # Output PDF file
+
+" -> doc
+
+opts <- docopt(doc,
+               version='0.2')
+
+## Command-line parsing .
+pdf_file = opts$p
+bamlist = opts$b
+coords = opts$c
+tabix = opts$g
+vl = as.numeric(opts$l)
+RGlist = opts$r
+
+# suppress empty 'RPlots.pdf' for non-interactive invocation
+if(!interactive()) pdf(NULL)
+
+###############
+
+# entry point for interactive (non command line) testing
+# make sure libraries are loaded
+#if(interactive()) {
+#  pdf_file <- 'test.pdf'
+#  bamlist <- '/Users/michaelaxtell/Desktop/EXP-49/bamlist.csv'
+  #bamlist <- '/Users/michaelaxtell/Desktop/EXP-49/MergedBamlist.csv'
+  #RGlist <- '/Users/michaelaxtell/Desktop/EXP-49/RGList.csv'
+#  RGlist <- NULL
+#  coords <- '3:251981-255513'  # SEOR1
+  #coords <- '1:1000-2000' # no sRNAs nor mRNAs in this interval - testing
+  #coords <- '1:26148-37461' # lots of mRNAs, for packing testing
+#  tabix <- '/Users/michaelaxtell/Desktop/EXP-49/TAIR10_GFF3_genes.shortNames.sorted.gff.gz'
+#  vl <- 253000 # arbitrary for testing
+  #tabix <- NULL
+#}
+
+# parse coords
+parsed_coords <- str_match(coords, '([^:]+):(\\d+)-(\\d+)')
+chrom <- parsed_coords[1,2]
+userStart <- as.numeric(parsed_coords[1,3])
+userEnd <- as.numeric(parsed_coords[1,4])
+
+# coords size limit is 100,000
+if((userEnd - userStart) > 100000) {
+  stop("Maximum interval size is 100,000 nts. Please revise your coordinates.")
+}
+
+# Read in the bamlist
+bams <- read_csv(bamlist, col_names = c("bamFilePath", "bamName"),
+                 col_types = "cc")
+
+# If present, read in the RG list
+if(!is.null(RGlist)) {
+  rgs <- read_csv(RGlist, col_names = c("RG", "RGName"),
+                  col_types = "cc")
+}
+
+
+# Define the function that returns the tidy data as a tibble
+sRNA_depths <- function (bamfile, bamname, coords, rg) {
+  # Returns a tibble
+  
+  # First write a temporary bam file with just the reads from the interval of interest.
+  cmd = "samtools view -b"
+  if(!is.null(rg)) {
+    cmd <- paste(cmd, '-r', rg)
+  }
+  cmd <- paste(cmd, bamfile, coords, '>', 'temp.bam')
+  system(cmd)
+  
+  # The temp.bam file needs to be indexed
+  system("samtools index temp.bam")
+  
+  # command parts for samtools depth calls for plus strand
+  left <- paste("samtools depth -g 16 -a -r", coords)
+  right <- 'temp.bam'
+  
+  # make all of the samtools depth calls
+ 
+  
+  Cov <- read_tsv(system(paste(left, right), intern = TRUE),
+                  col_names = c("Chromosome","Position", "Coverage"))
+  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 25', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>24')),
+                   by = c("Chromosome", "Position"))
+  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 24', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>23')),
+                   by = c("Chromosome", "Position"))
+  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 23', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>22')),
+                   by = c("Chromosome", "Position"))
+  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 22', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>21')),
+                   by = c("Chromosome", "Position"))
+  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 21', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>20')),
+                   by = c("Chromosome", "Position"))
+  
+  
+  # Now infer size-specific depths and clean up the tibble (plus strand at this point)
+  Cov <- Cov %>%
+    mutate(`<21`= Coverage - `>20`) %>%
+    mutate(`21` = Coverage - `>21` - `<21`) %>%
+    mutate(`22` = Coverage - `>22` - `21` - `<21`) %>%
+    mutate(`23` = Coverage - `>23` - `22` - `21` - `<21`) %>%
+    mutate(`24` = Coverage - `>24` - `23` - `22` - `21` - `<21`) %>%
+    select(Chromosome, Position, `<21`, `21`, `22`,
+           `23`, `24`, `>24`) %>%
+    mutate(Strand = '+')
+  
+  # Repeat the process for the minus strand reads
+  # command parts for samtools depth calls for plus strand
+  left <- paste("samtools depth -G 16 -a -r", coords)
+  right <- 'temp.bam'
+  
+  
+  # make all of the samtools depth calls, collecting into a single tibble
+  CovM <- read_tsv(system(paste(left, right), intern = TRUE),
+                  col_names = c("Chromosome","Position", "Coverage"))
+  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 25', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>24')),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 24', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>23')),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 23', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>22')),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 22', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>21')),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 21', right), intern = TRUE),
+                                 col_names = c("Chromosome","Position", '>20')),
+                   by = c("Chromosome", "Position"))
+  
+  
+  
+  # Now infer size-specific depths and clean up the tibble
+  # Minus strand coverage gets negative numbers
+  
+  CovM <- CovM %>%
+    mutate(`<21`= Coverage - `>20`) %>%
+    mutate(`21` = Coverage - `>21` - `<21`) %>%
+    mutate(`22` = Coverage - `>22` - `21` - `<21`) %>%
+    mutate(`23` = Coverage - `>23` - `22` - `21` - `<21`) %>%
+    mutate(`24` = Coverage - `>24` - `23` - `22` - `21` - `<21`) %>%
+    mutate(`<21` = 0 - `<21`) %>%
+    mutate(`21` = 0 - `21`) %>%
+    mutate(`22` = 0 - `22`) %>%
+    mutate(`23` = 0 - `23`) %>%
+    mutate(`24` = 0 - `24`) %>%
+    mutate(`>24` = 0 - `>24`) %>%
+    select(Chromosome, Position, `<21`, `21`, `22`,
+           `23`, `24`, `>24`) %>%
+    mutate(Strand = '-')
+  
+  # Join minus to plus, and add bamName
+  Cov <- Cov %>%
+    add_row(CovM) %>%
+    mutate(bamName = bamname)
+  
+  # Convert to reads per million. 
+
+  cmd <- "samtools view -c -F 256"
+  if(!is.null(rg)) {
+    cmd <- paste(cmd, '-r', rg)
+  }
+  cmd <- paste(cmd, bamfile)
+  n_reads <- as.numeric(system(cmd, intern = TRUE))
+  
+  # Then calculate reads per million
+  
+  Cov <- Cov %>%
+    mutate(`<21` = 1E6 * (`<21` / n_reads)) %>%
+    mutate(`21` = 1E6 * (`21` / n_reads)) %>%
+    mutate(`22` = 1E6 * (`22` / n_reads)) %>%
+    mutate(`23` = 1E6 * (`23` / n_reads)) %>%
+    mutate(`24` = 1E6 * (`24` / n_reads)) %>%
+    mutate(`>24` = 1E6 * (`>24` / n_reads))
+
+  # clean up
+  system("rm -f temp.bam*")
+  
+  # you're done!
+  return(Cov)
+}
+
+# First bamfile
+bamfile = bams$bamFilePath[1]
+bamname = bams$bamName[1]
+
+if(is.null(RGlist)) {
+  sRNAData <- sRNA_depths(bamfile, bamname, coords, NULL)
+  
+  # Any others
+  if(nrow(bams) > 1) {
+    for (i in 2:nrow(bams)) {
+      bamfile = bams$bamFilePath[i]
+      bamname = bams$bamName[i]
+      thisData <- sRNA_depths(bamfile, bamname, coords, NULL)
+      sRNAData <- sRNAData %>%
+        add_row(thisData)
+    }
+  }
+} else {
+  # read-group procedure.
+  # first read-group
+  rg <- rgs$RG[1]
+  rgname <- rgs$RGName[1]
+  sRNAData <- sRNA_depths(bamfile, rgname, coords, rg)
+  
+  # Any others
+  if(nrow(rgs) > 1) {
+    for (i in 2:nrow(rgs)) {
+      rg = rgs$RG[i]
+      rgname = rgs$RGName[i]
+      thisData <- sRNA_depths(bamfile, rgname, coords, rg)
+      sRNAData <- sRNAData %>%
+        add_row(thisData)
+    }
+  }
+}
+
+# Transformation to tidy format suitable for plotting
+sRNAData <- pivot_longer(sRNAData, cols=3:8, names_to = "RNA Size", values_to = "RPM")
+
+# define color palette
+sRNAcols = c("lightgray", # <21nts
+             "blue",      # 21nts
+             "mediumseagreen", # 22nts
+             "orange", # 23 nts
+             "tomato",    # 24nts
+             "darkgray")  # >24nts
+
+# define the order to list the Length categories
+Lorder = c("<21","21","22","23", "24",">24")
+
+# Get plus and minus, and remove useless 0 rows. That will save time during plotting
+# Must keep first and last positions.
+
+PosMin = min(sRNAData$Position)
+PosMax = max(sRNAData$Position)
+
+cov_plus <- filter(sRNAData, Strand == '+', (RPM != 0 | Position %in% c(PosMin, PosMax)))
+cov_minus <- filter(sRNAData, Strand == '-', (RPM != 0 | Position %in% c(PosMin, PosMax)))
+
+
+psRNA <- ggplot() +
+  geom_col(data = cov_plus, 
+           aes(x = Position, y = RPM, 
+               fill = factor(`RNA Size`, levels=Lorder)),
+           width = 1) +
+  geom_col(data = cov_minus, 
+           aes(x = Position, y = RPM, 
+               fill = factor(`RNA Size`, levels=Lorder)),
+           width = 1) +
+  scale_fill_manual(values = sRNAcols, name = "RNA length") +
+  facet_grid(bamName ~ .) +
+  geom_hline(yintercept = 0) +
+  theme_classic() +
+  labs(x = coords) +
+  coord_cartesian(xlim = c(userStart, userEnd))
+
+if(!is.null(vl)) {
+  psRNA <- psRNA + geom_vline(xintercept = vl, lty=2)
+}
+
+### tabix section for transcripts
+# preparation - general
+#  (grep ^"#" in.gff; grep -v ^"#" in.gff | sort -k1,1 -k4,4n) | bgzip > sorted.gff.gz;
+# tabix -p gff sorted.gff.gz
+
+# preparation actual, which includes conversion of chromosome names
+# cat TAIR10_GFF3_genes.gff | sed 's/ChrC/chloroplast/' | sed 's/ChrM/M/' | sed 's/Chr//' > TAIR10_GFF3_genes.shortNames.gff
+#
+# (grep ^"#" TAIR10_GFF3_genes.shortNames.gff; grep -v ^"#" TAIR10_GFF3_genes.shortNames.gff | sort -k1,1 -k4,4n) | bgzip > TAIR10_GFF3_genes.shortNames.sorted.gff.gz;
+#
+# tabix -p gff TAIR10_GFF3_genes.shortNames.sorted.gff.gz 
+
+# 'mRNA' or 'transcript' may be a parent. Look for both!
+# Parent listings may be comma-delimited lists.
+# Parents must point to IDs
+
+if(!is.null(tabix)) {
+  tabLines <- system(paste("tabix", tabix, coords), intern=TRUE)
+  # initiate an empty plot, because no matter what, there will be a plot, even if no
+  #  mRNAs/transcripts in the interval.
+  pmRNA <- ggplot() +
+    theme_void() +
+    labs(x = coords, y = NULL) +
+    coord_cartesian(xlim = c(userStart, userEnd))
+} else {
+  tabLines <- NULL
+  pmRNA <- NULL
+  # No plot for mRNAs if user did not provide a tabix
+}
+
+if(length(tabLines) > 0) {
+  
+  # add new line characters; allows read_tsv() to work if only one line is present
+  tabLines <- paste0(tabLines, '\n')
+  
+  tabData <- read_tsv(tabLines, col_names = c("Chromosome",
+                                              "Source",
+                                              "Type",
+                                              "Start",
+                                              "End",
+                                              "Score",
+                                              "Strand",
+                                              "Phase",
+                                              "Attributes"))
+  # Filter to remove unwanted types
+  tabData <- filter(tabData, Type %in% c("mRNA", "transcript", "exon", "CDS"))
+  mRNAData <- filter(tabData, Type %in% c("mRNA", "transcript"))
+  CDSData <- filter(tabData, Type == 'CDS')
+  exonData <- filter(tabData, Type == 'exon')
+  
+  # Do not proceed unless there is mRNA
+  if(nrow(mRNAData > 0)) {
+    
+    # Determine mRNA/transcript Y-levels, parse ID
+    Ybins <- disjointBins(IRanges(start = mRNAData$Start, end = mRNAData$End))
+    mRNAData <- mutate(mRNAData, Y = Ybins) %>%
+      mutate(ID = str_match(Attributes, "ID=([^;]+)")[,2])
+    
+    # Note Y-levels to be used for any exons and CDSs, based on their parents
+    mRNA_Ys <- select(mRNAData, Y, ID)
+    
+    # Parse exons and CDS (if present), noting Parent. 
+    # If the Parent= attribute has more than one entry,
+    #  only the FIRST ONE is recognized!
+    # Also add the Y values of the corresponding mRNAs/transripts
+    
+    if(nrow(CDSData) > 0) {
+      CDSData <- mutate(CDSData, ID = str_match(Attributes, "Parent=([^;,]+)")[,2]) %>%
+        left_join(mRNA_Ys, by="ID")
+    }
+    
+    if(nrow(exonData) > 0) {
+      exonData <- mutate(exonData, ID = str_match(Attributes, "Parent=([^;,]+)")[,2]) %>%
+        left_join(mRNA_Ys, by="ID")
+    }
+    
+    # mRNAs are stranded, need new columns for plotting arrows in the correct directions
+    mRNAData <- mutate(mRNAData, ArrowStart = if_else(Strand == '+', Start, End)) %>%
+      mutate(ArrowEnd = if_else(Strand == '+', End, Start))
+    
+    # plot. The first two layers (exons, CDSs) are conditional (exon and/or CDSs can be missing)
+    if(nrow(exonData) > 0) {
+      pmRNA <- pmRNA + 
+        geom_rect(data = exonData, aes(xmin = Start, xmax = End, ymin = Y-0.15, ymax= Y+0.15),
+                  fill = "salmon")
+    }
+    if(nrow(CDSData) > 0) {
+      pmRNA <- pmRNA +
+        geom_rect(data = CDSData, aes(xmin = Start, xmax = End, ymin = Y-0.35, ymax= Y+0.35),
+                  fill = "lightblue")
+    }
+    pmRNA <- pmRNA +
+      geom_segment(data = mRNAData, aes(x = ArrowStart, y = Y, xend = ArrowEnd, yend = Y),
+                   arrow = arrow()) +
+      geom_text(data = mRNAData, aes(x = (Start + End)/2, y = Y + 0.2, label = ID),
+                check_overlap = TRUE) 
+  }
+}
+
+# vertical line for mRNA plot, if exists
+if(!is.null(pmRNA)) {
+  pmRNA <- pmRNA + geom_vline(xintercept = vl, lty = 2)
+}
+
+# Sizing of output plot depends on number of bams OR readgroups and depth of mRNA packing
+# vInches = nrow(bams)
+
+if(is.null(RGlist)) {
+  seqRows = nrow(bams)
+} else {
+  seqRows = nrow(rgs)
+}
+
+if(!is.null(pmRNA)) {
+  if(!is.null(Ybins)) {
+    rh <- c(0.33 * max(Ybins), seqRows)
+  } else {
+    # if there was tabix but no mRNAs in the interval
+    rh <- c(1, seqRows)
+  }
+  vInches <- sum(rh)
+  finalP <- plot_grid(pmRNA, psRNA, align = "v", axis = "lrtb", nrow = 2, rel_heights = rh)
+} else {
+  vInches <- seqRows
+  finalP <- psRNA
+}
+ggsave2(pdf_file, plot = finalP, width = 7, height = vInches, units = "in")
+
+# ShortStack gff? later
+# Shiny? later
+
+
+
+
+
+
+
+
+
+
