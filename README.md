@@ -36,6 +36,9 @@ So, this script is a way to visualize small RNA-seq alignments that does meet al
 
 
 ## Usage
+
+*NOTE* : `sRNA_Viewer` uses a shebang on the first line to specify `#!/usr/bin/env Rscript --vanilla`. If your system has `Rscript` somewhere else, you will need to explicitly call `Rscript --vanilla sRNA_Viewer ...`.
+
 ```
   sRNA_Viewer [-g TABIXGFF -l VLINE -r RGLIST] -c COORDINATES -b BAMLIST -p OUTPUTFILE
   sRNA_Viewer -h | --help

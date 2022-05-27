@@ -70,19 +70,19 @@ if(!interactive()) pdf(NULL)
 
 # entry point for interactive (non command line) testing
 # make sure libraries are loaded
-#if(interactive()) {
-#  pdf_file <- 'test.pdf'
-#  bamlist <- '/Users/michaelaxtell/Desktop/EXP-49/bamlist.csv'
+if(interactive()) {
+  #pdf_file <- 'test.pdf'
+  #bamlist <- 'bamfiles.csv'
   #bamlist <- '/Users/michaelaxtell/Desktop/EXP-49/MergedBamlist.csv'
-  #RGlist <- '/Users/michaelaxtell/Desktop/EXP-49/RGList.csv'
+  #RGlist <- 'readgroups.csv'
 #  RGlist <- NULL
-#  coords <- '3:251981-255513'  # SEOR1
+  #coords <- '3:251981-255513'  # SEOR1
   #coords <- '1:1000-2000' # no sRNAs nor mRNAs in this interval - testing
   #coords <- '1:26148-37461' # lots of mRNAs, for packing testing
-#  tabix <- '/Users/michaelaxtell/Desktop/EXP-49/TAIR10_GFF3_genes.shortNames.sorted.gff.gz'
-#  vl <- 253000 # arbitrary for testing
+  #tabix <- '/Users/michaelaxtell/Desktop/EXP-49/TAIR10_GFF3_genes.shortNames.sorted.gff.gz'
+  #vl <- 254516 # actual
   #tabix <- NULL
-#}
+}
 
 # parse coords
 parsed_coords <- str_match(coords, '([^:]+):(\\d+)-(\\d+)')
@@ -105,12 +105,12 @@ if(!is.null(RGlist)) {
                   col_types = "cc")
 }
 
-
 # Define the function that returns the tidy data as a tibble
 sRNA_depths <- function (bamfile, bamname, coords, rg) {
   # Returns a tibble
   
   # First write a temporary bam file with just the reads from the interval of interest.
+
   cmd = "samtools view -b"
   if(!is.null(rg)) {
     cmd <- paste(cmd, '-r', rg)
@@ -127,25 +127,29 @@ sRNA_depths <- function (bamfile, bamname, coords, rg) {
   
   # make all of the samtools depth calls
  
-  
-  Cov <- read_tsv(system(paste(left, right), intern = TRUE),
-                  col_names = c("Chromosome","Position", "Coverage"))
-  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 25', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>24')),
+  Cov <- read_tsv(I(system(paste(left, right), intern = TRUE)),
+                  col_names = c("Chromosome","Position", "Coverage"),
+                  show_col_types = FALSE)
+  Cov <- left_join(Cov, read_tsv(I(system(paste(left, '-l 25', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>24'),
+                                 show_col_types = FALSE),
                    by = c("Chromosome", "Position"))
-  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 24', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>23')),
+  Cov <- left_join(Cov, read_tsv(I(system(paste(left, '-l 24', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>23'),
+                                 show_col_types = FALSE),
                    by = c("Chromosome", "Position"))
-  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 23', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>22')),
+  Cov <- left_join(Cov, read_tsv(I(system(paste(left, '-l 23', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>22'),
+                                 show_col_types = FALSE),
                    by = c("Chromosome", "Position"))
-  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 22', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>21')),
+  Cov <- left_join(Cov, read_tsv(I(system(paste(left, '-l 22', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>21'),
+                                 show_col_types = FALSE),
                    by = c("Chromosome", "Position"))
-  Cov <- left_join(Cov, read_tsv(system(paste(left, '-l 21', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>20')),
+  Cov <- left_join(Cov, read_tsv(I(system(paste(left, '-l 21', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>20'),
+                                 show_col_types = FALSE),
                    by = c("Chromosome", "Position"))
-  
   
   # Now infer size-specific depths and clean up the tibble (plus strand at this point)
   Cov <- Cov %>%
@@ -165,25 +169,30 @@ sRNA_depths <- function (bamfile, bamname, coords, rg) {
   
   
   # make all of the samtools depth calls, collecting into a single tibble
-  CovM <- read_tsv(system(paste(left, right), intern = TRUE),
-                  col_names = c("Chromosome","Position", "Coverage"))
-  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 25', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>24')),
-                   by = c("Chromosome", "Position"))
-  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 24', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>23')),
-                   by = c("Chromosome", "Position"))
-  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 23', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>22')),
-                   by = c("Chromosome", "Position"))
-  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 22', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>21')),
-                   by = c("Chromosome", "Position"))
-  CovM <- left_join(CovM, read_tsv(system(paste(left, '-l 21', right), intern = TRUE),
-                                 col_names = c("Chromosome","Position", '>20')),
-                   by = c("Chromosome", "Position"))
+  CovM <- read_tsv(I(system(paste(left, right), intern = TRUE)),
+                  col_names = c("Chromosome","Position", "Coverage"),
+                  show_col_types = FALSE)
   
-  
+  CovM <- left_join(CovM, read_tsv(I(system(paste(left, '-l 25', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>24'),
+                                 show_col_types = FALSE),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(I(system(paste(left, '-l 24', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>23'),
+                                 show_col_types = FALSE),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(I(system(paste(left, '-l 23', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>22'),
+                                 show_col_types = FALSE),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(I(system(paste(left, '-l 22', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>21'),
+                                 show_col_types = FALSE),
+                   by = c("Chromosome", "Position"))
+  CovM <- left_join(CovM, read_tsv(I(system(paste(left, '-l 21', right), intern = TRUE)),
+                                 col_names = c("Chromosome","Position", '>20'),
+                                 show_col_types = FALSE),
+                   by = c("Chromosome", "Position"))
   
   # Now infer size-specific depths and clean up the tibble
   # Minus strand coverage gets negative numbers
@@ -203,7 +212,7 @@ sRNA_depths <- function (bamfile, bamname, coords, rg) {
     select(Chromosome, Position, `<21`, `21`, `22`,
            `23`, `24`, `>24`) %>%
     mutate(Strand = '-')
-  
+
   # Join minus to plus, and add bamName
   Cov <- Cov %>%
     add_row(CovM) %>%
@@ -228,12 +237,14 @@ sRNA_depths <- function (bamfile, bamname, coords, rg) {
     mutate(`24` = 1E6 * (`24` / n_reads)) %>%
     mutate(`>24` = 1E6 * (`>24` / n_reads))
 
+
   # clean up
   system("rm -f temp.bam*")
   
   # you're done!
   return(Cov)
 }
+
 
 # First bamfile
 bamfile = bams$bamFilePath[1]
@@ -257,6 +268,7 @@ if(is.null(RGlist)) {
   # first read-group
   rg <- rgs$RG[1]
   rgname <- rgs$RGName[1]
+
   sRNAData <- sRNA_depths(bamfile, rgname, coords, rg)
   
   # Any others
@@ -358,7 +370,8 @@ if(length(tabLines) > 0) {
                                               "Score",
                                               "Strand",
                                               "Phase",
-                                              "Attributes"))
+                                              "Attributes"),
+                      show_col_types = FALSE)
   # Filter to remove unwanted types
   tabData <- filter(tabData, Type %in% c("mRNA", "transcript", "exon", "CDS"))
   mRNAData <- filter(tabData, Type %in% c("mRNA", "transcript"))
